@@ -14,23 +14,26 @@ def generate_random_melody(length=config.TOTAL_STEPS):
         melody.append(note)
     return melody
 
-def save_melody_to_midi(melody, filename="output.mid", tempo=120):
+def save_melody_to_midi(melody, filename="output.mid", tempo=80):
     """
     保存 MIDI 文件 (包含连音处理 & 和弦伴奏)
     """
     track = 0
-    # --- 【关键修改】定义两个不同的通道 ---
     channel_melody = 0  # 旋律通道
-    channel_chord = 1   # 和弦伴奏通道 (避开冲突)
+    channel_chord = 1   # 和弦伴奏通道
     
     time = 0
     volume = 100
-    step_duration = 0.25 # 十六分音符
     
-    MyMIDI = MIDIFile(1) # 创建1个轨道
+    # --- 【关键修改】 动态计算步长 ---
+    # 如果 STEPS_PER_BEAT=4, duration=0.25 (16分音符)
+    # 如果 STEPS_PER_BEAT=2, duration=0.5 (8分音符)
+    step_duration = 1.0 / config.STEPS_PER_BEAT 
+    
+    MyMIDI = MIDIFile(1) 
     MyMIDI.addTempo(track, time, tempo)
     
-    # --- 1. 旋律写入 (使用 channel_melody) ---
+    # --- 1. 旋律写入 ---
     if len(melody) > 0:
         current_pitch = melody[0]
         current_length = 1
@@ -42,7 +45,6 @@ def save_melody_to_midi(melody, filename="output.mid", tempo=120):
             current_length += 1
         else:
             if current_pitch != 0:
-                # 注意这里使用的是 channel_melody
                 MyMIDI.addNote(track, channel_melody, current_pitch, 
                                current_start * step_duration, 
                                current_length * step_duration, volume)
@@ -56,15 +58,12 @@ def save_melody_to_midi(melody, filename="output.mid", tempo=120):
                        current_start * step_duration, 
                        current_length * step_duration, volume)
             
-    # --- 2. 写入背景和弦 (使用 channel_chord) ---
+    # --- 2. 写入背景和弦 ---
     for i, root in enumerate(config.CHORD_ROOTS):
         start_time = i * config.CHORD_DURATION
-        # 注意：这里必须使用 channel_chord，而不是原来的 channel
-        # 根音
+        # 和弦伴奏
         MyMIDI.addNote(track, channel_chord, root, start_time, config.CHORD_DURATION, 70)
-        # 三音
         MyMIDI.addNote(track, channel_chord, root+4, start_time, config.CHORD_DURATION, 70)
-        # 五音
         MyMIDI.addNote(track, channel_chord, root+7, start_time, config.CHORD_DURATION, 70)
 
     with open(filename, "wb") as f:
